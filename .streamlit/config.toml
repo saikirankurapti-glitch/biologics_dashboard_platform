@@ -13,7 +13,6 @@ toolbarMode = "viewer"
 level = "info"
 
 [server]
-port = 8503
 headless = true
 runOnSave = true
 enableXsrfProtection = true
