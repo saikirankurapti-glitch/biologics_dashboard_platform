@@ -1,13 +1,13 @@
 """
 Configuration module for Biologics Discovery Platform Dashboard
-Loads settings from environment variables with sensible defaults
+Loads settings from Streamlit secrets (when deployed) or environment variables (local)
 """
 
 import os
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables for local development
 load_dotenv()
 
 # MongoDB Configuration
@@ -16,8 +16,9 @@ DATABASE_NAME = os.getenv("DATABASE_NAME", "biologics_platform")
 
 if MONGODB_URL.strip() == "":
     raise ValueError(
-        "MONGODB_URL environment variable not set. "
-        "Copy .env.example to .env and set MONGODB_URL to your MongoDB connection string."
+        "MONGODB_URL not set. "
+        "For local dev: Copy .env.example to .env and set MONGODB_URL. "
+        "For Streamlit Cloud: Add MONGODB_URL to the Secrets section in Advanced Settings."
     )
 
 # API Keys
