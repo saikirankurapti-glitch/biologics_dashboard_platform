@@ -49,6 +49,9 @@ class MongoDBConnection:
                 self._db = self._client[config.DATABASE_NAME]
                 logger.info(f"Successfully connected to MongoDB database: {config.DATABASE_NAME}")
             except Exception as e:
+                # Reset connection state so that next retry can attempt reconnecting
+                self._client = None
+                self._db = None
                 msg = (
                     f"Failed to connect to MongoDB at {config.MONGODB_URL}. "
                     "Please verify your MONGODB_URL, network access, and DNS settings."
@@ -106,8 +109,14 @@ class MongoDBOperations:
     
     def __init__(self):
         self.connection = get_mongo_connection()
-        self.connection.connect()
-        self.db = self.connection.get_db()
+        try:
+            self.connection.connect()
+        except Exception as e:
+            logger.warning(f"Initial connection to MongoDB failed: {e}")
+            
+    @property
+    def db(self):
+        return self.connection.get_db()
     
     def find(self, collection_name: str, query: Dict = None, projection: Dict = None, limit: int = 0) -> List[Dict]:
         """
