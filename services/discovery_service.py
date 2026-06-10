@@ -20,9 +20,8 @@ class DiscoveryService:
         self.schemas = None
         self.data_dictionary = None
     
-    @st.cache_resource
-    def get_schema_analyzer(_self):
-        """Get cached schema analyzer"""
+    def get_schema_analyzer(self):
+        """Get schema analyzer"""
         return SchemaAnalyzer()
     
     def discover_all_collections(self) -> Dict[str, Dict]:
