@@ -123,3 +123,7 @@ Desktop.ini
 # Backup and OS f
 *~
 *.swp
+
+# Agent skills
+.agents/
+skills-lock.json

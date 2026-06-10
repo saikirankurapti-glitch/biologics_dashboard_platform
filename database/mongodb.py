@@ -209,3 +209,22 @@ class MongoDBOperations:
         except Exception as e:
             logger.error(f"Error getting stats for {collection_name}: {str(e)}")
             return {}
+
+    def insert_one(self, collection_name: str, document: Dict) -> Any:
+        """
+        Insert a single document (Write operation)
+        
+        Args:
+            collection_name: Name of the collection
+            document: Document to insert
+            
+        Returns:
+            Inserted document ID or None
+        """
+        try:
+            collection = self.db[collection_name]
+            result = collection.insert_one(document)
+            return result.inserted_id
+        except Exception as e:
+            logger.error(f"Error inserting document into {collection_name}: {str(e)}")
+            return None

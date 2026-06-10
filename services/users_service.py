@@ -19,33 +19,104 @@ class UsersService:
     def __init__(self):
         self.metrics = MetricsCalculator()
         self.db_ops = MongoDBOperations()
+
+    def _build_query(self, date_field: str, start_date=None, end_date=None, user_email=None, email_field='user_email') -> dict:
+        query = {}
+        date_query = {}
+        if start_date:
+            date_query['$gte'] = start_date
+        if end_date:
+            date_query['$lte'] = end_date
+        if date_query:
+            query[date_field] = date_query
+            
+        if user_email:
+            query[email_field] = user_email
+        return query
     
-    def get_total_users(self, users_collection: str = "users") -> int:
+    def get_total_users(self, users_collection: str = "users", start_date=None, end_date=None, user_email=None) -> int:
         """Get total user count"""
-        return self.metrics.count_documents(users_collection)
+        query = self._build_query('created_at', start_date, end_date, user_email, 'email')
+        return self.metrics.count_documents(users_collection, query)
     
-    def get_active_users(self, days: int = 7) -> int:
+    def get_active_users(self, days: int = 7, start_date=None, end_date=None, user_email=None) -> int:
         """Get active users in last N days"""
-        return self.metrics.get_active_users(days=days)
-    
-    def get_new_users(self, days: int = 30) -> int:
-        """Get new users in last N days"""
-        return self.metrics.get_new_users(days=days)
-    
-    def get_daily_active_users(self, days: int = 30) -> List[Dict]:
-        """Get DAU trend"""
-        return self.metrics.get_daily_active_users(days=days)
-    
-    def get_monthly_active_users(self, months: int = 6) -> List[Dict]:
-        """Get MAU trend"""
         try:
-            cutoff_date = datetime.now() - timedelta(days=30*months)
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=days)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
+            
             pipeline = [
+                {'$match': query},
                 {
-                    '$match': {
-                        'timestamp': {'$gte': cutoff_date}
+                    '$group': {
+                        '_id': '$user_id'
                     }
                 },
+                {
+                    '$count': 'active_users'
+                }
+            ]
+            results = self.db_ops.aggregate("user_activities", pipeline)
+            return results[0]['active_users'] if results else 0
+        except Exception as e:
+            logger.error(f"Error calculating active users: {str(e)}")
+            return 0
+    
+    def get_new_users(self, days: int = 30, start_date=None, end_date=None, user_email=None) -> int:
+        """Get new users in last N days"""
+        if not start_date:
+            start_date = datetime.now() - timedelta(days=days)
+        query = self._build_query('created_at', start_date, end_date, user_email, 'email')
+        return self.db_ops.count_documents("users", query)
+    
+    def get_daily_active_users(self, days: int = 30, start_date=None, end_date=None, user_email=None) -> List[Dict]:
+        """Get DAU trend"""
+        try:
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=days)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
+            
+            pipeline = [
+                {'$match': query},
+                {
+                    '$group': {
+                        '_id': {
+                            '$dateToString': {
+                                'format': '%Y-%m-%d',
+                                'date': '$timestamp'
+                            }
+                        },
+                        'active_users': {'$addToSet': '$user_id'},
+                        'activity_count': {'$sum': 1}
+                    }
+                },
+                {
+                    '$project': {
+                        'date': '$_id',
+                        'user_count': {'$size': '$active_users'},
+                        'activity_count': 1,
+                        '_id': 0
+                    }
+                },
+                {
+                    '$sort': {'date': 1}
+                }
+            ]
+            return self.db_ops.aggregate("user_activities", pipeline)
+        except Exception as e:
+            logger.error(f"Error calculating daily active users: {str(e)}")
+            return []
+    
+    def get_monthly_active_users(self, months: int = 6, start_date=None, end_date=None, user_email=None) -> List[Dict]:
+        """Get MAU trend"""
+        try:
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=30*months)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
+            
+            pipeline = [
+                {'$match': query},
                 {
                     '$group': {
                         '_id': {
@@ -78,26 +149,78 @@ class UsersService:
             logger.error(f"Error calculating MAU: {str(e)}")
             return []
     
-    def get_session_count(self, days: int = 30) -> int:
+    def get_session_count(self, days: int = 30, start_date=None, end_date=None, user_email=None) -> int:
         """Get session count"""
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
-            return self.db_ops.count_documents(
-                "user_activities",
-                {'timestamp': {'$gte': cutoff_date}}
-            )
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=days)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
+            return self.db_ops.count_documents("user_activities", query)
         except Exception as e:
             logger.error(f"Error getting session count: {str(e)}")
             return 0
     
-    def get_top_active_users(self, limit: int = 10) -> List[Dict]:
+    def get_top_active_users(self, limit: int = 10, start_date=None, end_date=None, user_email=None) -> List[Dict]:
         """Get top active users"""
-        return self.metrics.get_top_users(limit=limit)
-    
-    def get_user_department_usage(self, limit: int = 10) -> List[Dict]:
-        """Get department usage metrics"""
         try:
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
             pipeline = [
+                {'$match': query},
+                {
+                    '$group': {
+                        '_id': '$user_email',
+                        'activity_count': {'$sum': 1}
+                    }
+                },
+                {
+                    '$sort': {'activity_count': -1}
+                },
+                {
+                    '$limit': limit
+                },
+                {
+                    '$project': {
+                        'user_id': '$_id',
+                        'activity_count': 1,
+                        '_id': 0
+                    }
+                }
+            ]
+            return self.db_ops.aggregate("user_activities", pipeline)
+        except Exception as e:
+            logger.error(f"Error getting top active users: {str(e)}")
+            return []
+    
+    def get_user_department_usage(self, limit: int = 10, start_date=None, end_date=None, user_email=None) -> List[Dict]:
+        """Get department usage metrics mapping activity actions to departments dynamically"""
+        try:
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
+            pipeline = [
+                {'$match': query},
+                {
+                    '$project': {
+                        'user_id': 1,
+                        'department': {
+                            '$switch': {
+                                'branches': [
+                                    {
+                                        'case': {'$in': ['$action', ['POCKET_SCAN', 'SEARCH_TARGET']]},
+                                        'then': 'Drug Discovery'
+                                    },
+                                    {
+                                        'case': {'$in': ['$action', ['LOGIN', 'REGISTER']]},
+                                        'then': 'User Management'
+                                    },
+                                    {
+                                        'case': {'$in': ['$action', ['SYSTEM_CHECK']]},
+                                        'then': 'IT Operations'
+                                    }
+                                ],
+                                'default': 'General'
+                            }
+                        }
+                    }
+                },
                 {
                     '$group': {
                         '_id': '$department',
@@ -125,16 +248,14 @@ class UsersService:
             logger.error(f"Error getting department usage: {str(e)}")
             return []
     
-    def get_activity_heatmap_data(self, days: int = 30) -> pd.DataFrame:
+    def get_activity_heatmap_data(self, days: int = 30, start_date=None, end_date=None, user_email=None) -> pd.DataFrame:
         """Get activity heatmap data (day of week vs hour)"""
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=days)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user_email')
             pipeline = [
-                {
-                    '$match': {
-                        'timestamp': {'$gte': cutoff_date}
-                    }
-                },
+                {'$match': query},
                 {
                     '$group': {
                         '_id': {
@@ -166,16 +287,14 @@ class UsersService:
             logger.error(f"Error getting activity heatmap: {str(e)}")
             return pd.DataFrame()
     
-    def get_login_trend(self, days: int = 30) -> List[Dict]:
+    def get_login_trend(self, days: int = 30, start_date=None, end_date=None, user_email=None) -> List[Dict]:
         """Get login trend over time"""
         try:
-            cutoff_date = datetime.now() - timedelta(days=days)
+            if not start_date:
+                start_date = datetime.now() - timedelta(days=days)
+            query = self._build_query('timestamp', start_date, end_date, user_email, 'user')
             pipeline = [
-                {
-                    '$match': {
-                        'timestamp': {'$gte': cutoff_date}
-                    }
-                },
+                {'$match': query},
                 {
                     '$group': {
                         '_id': {
@@ -199,17 +318,7 @@ class UsersService:
             return []
     
     def get_user_engagement_score(self, user_id: str) -> Dict:
-        """
-        Calculate engagement score for a user
-        
-        Returns:
-            {
-                'user_id': str,
-                'activity_count': int,
-                'last_active': datetime,
-                'engagement_score': float
-            }
-        """
+        """Calculate engagement score for a user"""
         try:
             pipeline = [
                 {

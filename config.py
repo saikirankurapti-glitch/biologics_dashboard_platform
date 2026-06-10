@@ -44,7 +44,8 @@ EXPECTED_COLLECTIONS = [
     "preformulation_reports",
     "formulation_designs",
     "experiments",
-    "report_registry"
+    "report_registry",
+    "resource_usage"
 ]
 
 # Configure logging

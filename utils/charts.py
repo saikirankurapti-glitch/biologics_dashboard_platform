@@ -13,27 +13,27 @@ logger = logging.getLogger(__name__)
 
 # Color schemes
 COLORS_PROFESSIONAL = {
-    'primary': '#1f77b4',
-    'secondary': '#ff7f0e',
-    'success': '#2ca02c',
-    'warning': '#d62728',
-    'info': '#9467bd',
-    'light': '#e0e0e0',
-    'dark': '#262626'
+    'primary': '#00687a',     # Teal
+    'secondary': '#312E81',   # Deep Indigo
+    'success': '#2ca02c',     # Green
+    'warning': '#A855F7',     # Vibrant Purple
+    'info': '#3B82F6',        # Data Blue
+    'light': '#eff4ff',
+    'dark': '#0b1c30'
 }
 
 THEME_DARK = {
-    'plot_bgcolor': '#1a1a1a',
-    'paper_bgcolor': '#0f0f0f',
-    'font_color': '#ffffff',
-    'gridcolor': '#333333'
+    'plot_bgcolor': 'rgba(30, 41, 59, 0.2)',
+    'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+    'font_color': '#f8fafc',
+    'gridcolor': '#334155'
 }
 
 THEME_LIGHT = {
-    'plot_bgcolor': '#ffffff',
-    'paper_bgcolor': '#f5f5f5',
-    'font_color': '#000000',
-    'gridcolor': '#e0e0e0'
+    'plot_bgcolor': 'rgba(255, 255, 255, 0.5)',
+    'paper_bgcolor': 'rgba(0, 0, 0, 0)',
+    'font_color': '#0b1c30',
+    'gridcolor': '#e2e8f0'
 }
 
 
